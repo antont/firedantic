@@ -111,15 +111,12 @@ class AsyncBareModel(pydantic.BaseModel, ABC):
         :param filter_: The filter criteria.
         :return: List of found models.
         """
-        colref: AsyncCollectionReference = cls._get_col_ref()
 
-        maybe_query: Union[AsyncCollectionReference, AsyncQuery] | None = None
+        query: Union[AsyncCollectionReference, AsyncQuery] = cls._get_col_ref()
         print("[find]", filter_)
         if filter_:
-            maybe_query = colref
             for key, value in filter_.items():
-                maybe_query = cls._add_filter(maybe_query, key, value)
-        query: Union[AsyncCollectionReference, AsyncQuery] = maybe_query or colref
+                query = cls._add_filter(query, key, value)
 
         if order_by is not None:
             field, direction = order_by
