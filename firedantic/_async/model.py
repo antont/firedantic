@@ -1,6 +1,6 @@
 from abc import ABC
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
 
 import pydantic
 from google.cloud.firestore_v1 import (
@@ -97,7 +97,13 @@ class AsyncBareModel(pydantic.BaseModel, ABC):
 
     @classmethod
     async def find(
-        cls: Type[TAsyncBareModel], filter_: Optional[dict] = None
+        cls: Type[TAsyncBareModel],
+        filter_: Optional[dict] = None,
+        order_by: Optional[
+            tuple[str, Union[Literal["ASCENDING"], Literal["DESCENDING"]]]
+        ] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
     ) -> List[TAsyncBareModel]:
         """Returns a list of models from the database based on a filter.
 
@@ -107,13 +113,18 @@ class AsyncBareModel(pydantic.BaseModel, ABC):
         :param filter_: The filter criteria.
         :return: List of found models.
         """
-        if not filter_:
-            filter_ = {}
-
         query: Union[AsyncQuery, AsyncCollectionReference] = cls._get_col_ref()
+        if filter_:
+            for key, value in filter_.items():
+                query = cls._add_filter(query, key, value)
 
-        for key, value in filter_.items():
-            query = cls._add_filter(query, key, value)
+        if order_by is not None:
+            field, direction = order_by
+            query = query.order_by(field, direction=direction)
+        if limit is not None:
+            query = query.limit(limit)
+        if offset is not None:
+            query = query.offset(offset)
 
         def _cls(doc_id: str, data: Dict[str, Any]) -> TAsyncBareModel:
             if cls.__document_id__ in data:
