@@ -1,6 +1,6 @@
 from abc import ABC
 from logging import getLogger
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Type, TypeVar, Union
 
 import pydantic
 from google.cloud.firestore_v1 import (
@@ -96,7 +96,15 @@ class BareModel(pydantic.BaseModel, ABC):
         return getattr(self, self.__document_id__, None)
 
     @classmethod
-    def find(cls: Type[TBareModel], filter_: Optional[dict] = None) -> List[TBareModel]:
+    def find(
+        cls: Type[TBareModel],
+        filter_: Optional[dict] = None,
+        order_by: Optional[
+            tuple[str, Union[Literal["ASCENDING"], Literal["DESCENDING"]]]
+        ] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[TBareModel]:
         """Returns a list of models from the database based on a filter.
 
         Example: `Company.find({"company_id": "1234567-8"})`.
@@ -105,13 +113,18 @@ class BareModel(pydantic.BaseModel, ABC):
         :param filter_: The filter criteria.
         :return: List of found models.
         """
-        if not filter_:
-            filter_ = {}
-
         query: Union[BaseQuery, CollectionReference] = cls._get_col_ref()
+        if filter_:
+            for key, value in filter_.items():
+                query = cls._add_filter(query, key, value)
 
-        for key, value in filter_.items():
-            query = cls._add_filter(query, key, value)
+        if order_by is not None:
+            field, direction = order_by
+            query = query.order_by(field, direction=direction)
+        if limit is not None:
+            query = query.limit(limit)
+        if offset is not None:
+            query = query.offset(offset)
 
         def _cls(doc_id: str, data: Dict[str, Any]) -> TBareModel:
             if cls.__document_id__ in data:
